@@ -1,7 +1,7 @@
 ﻿#include <iostream>
-#include <fstream>
+#include <fstream> //работа с файлами (чтение(иф),запись в файлы(оф), (ф) чтение)
 #include <vector>
-#include <algorithm>
+#include <algorithm> // Алгоритмы обработки данных
 #include <string>
 
 using namespace std;
@@ -17,27 +17,26 @@ vector<Task> tasks;    // Глобальный вектор для хранен�
 
 // Функция загрузки задач из файла
 void loadTasks() {
-    ifstream file("tasks.txt");
-    if (!file.is_open()) {
+    ifstream file("tasks.txt"); //  открыть файл "tasks.txt" для чтения
+    if (!file.is_open()) {  // ! не
         cout << "Файл tasks.txt не найден\n";
         return;
     }
 
     string line;
-    while (getline(file, line)) {
+    while (getline(file, line)) { //читает одну строку из файла в переменную line
         // Разделяем строку по запятым
-        int pos1 = line.find(',');
-        int pos2 = line.find(',', pos1 + 1);
+        int pos1 = line.find(',');  //line.find(',') //ищет первое вхождение запятой в строке
+        int pos2 = line.find(',', pos1 + 1);  // ищет запятую, начиная с позиции после первой найденной
 
         // Проверяем, что найдены оба разделителя
         if (pos1 != string::npos && pos2 != string::npos) {
             // Создаем задачу из частей строки
-            Task task;
-            task.title = line.substr(0, pos1);
-            task.priority = stoi(line.substr(pos1 + 1, pos2 - pos1 - 1));
-            task.deadline = line.substr(pos2 + 1);
-
-            tasks.push_back(task);
+            Task task; //1-пользовательский тип,2- обьект задачи
+            task.title = line.substr(0, pos1); //подстрока от начала до первой запятой(весь текст до первой запятой)
+            task.priority = stoi(line.substr(pos1 + 1, pos2 - pos1 - 1)); //внутри:текст между первой и второй запятой, снаружи:чтобы строка содержала валидное число
+            task.deadline = line.substr(pos2 + 1); //весь текст после второй запятой
+            tasks.push_back(task); //Добавление элемента в конец вектора
         }
     }
     file.close();
@@ -45,16 +44,16 @@ void loadTasks() {
 }
 
 // Функция сохранения задач в файл
-void saveTasks() {
-    ofstream file("tasks.txt");
-    for (auto& task : tasks) {
-        file << task.title << "," << task.priority << "," << task.deadline << endl;
+void saveTasks() { // сохраняет все задачи из вектора tasks в файл
+    ofstream file("tasks.txt"); //открывает файл для записи
+    for (auto& task : tasks) { //ange-based for loop - цикл по всем элементам вектора;auto& task - ссылка на каждый элемент вектор;tasks - вектор с задачами
+        file << task.title << "," << task.priority << "," << task.deadline << endl; //file << - запись в файл;task.title - название задачи;"," - разделитель полей
     }
     file.close();
 }
 
 // Функция добавления новой задачи
-void addTask() {
+void addTask() { //интерактивное создание новой задачи через пользовательский ввод
     Task task;
 
     cout << "Введите название задачи: ";
@@ -65,7 +64,6 @@ void addTask() {
         cout << "Отмена добавления.\n";
         return;
     }
-
     cout << "Введите приоритет (число): ";
     cin >> task.priority;
     cin.ignore(); // Очищаем буфер после ввода числа
@@ -75,7 +73,7 @@ void addTask() {
 
     // Добавляем задачу в вектор
     tasks.push_back(task);
-
+    
     // Сохраняем изменения в файл
     saveTasks();
 
@@ -110,7 +108,7 @@ void searchTask() {
         }
     }
 
-    if (!found) {
+    if (!found) { 
         cout << "Задачи с таким названием не найдены.\n";
         out << "Ничего не найдено" << endl;
     }
@@ -273,4 +271,5 @@ int main() {
     out.close();
 
     return 0;
+
 }
