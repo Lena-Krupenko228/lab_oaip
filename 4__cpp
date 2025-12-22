@@ -1,0 +1,290 @@
+#include <pqxx/pqxx>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <memory>
+
+using namespace std;
+
+// Классы
+class Task {
+public:
+    virtual string getStatusType() = 0;
+    virtual ~Task() {}
+};
+
+class CompletedTask : public Task {
+public:
+    string getStatusType() override { return "Completed"; }
+};
+
+class InProgressTask : public Task {
+public:
+    string getStatusType() override { return "In Progress"; }
+};
+
+class DeferredTask : public Task {
+public:
+    string getStatusType() override { return "Deferred"; }
+};
+
+template<typename T, typename U>
+class Pair {
+public:
+    T first;
+    U second;
+    Pair(T f, U s) : first(f), second(s) {}
+};
+
+
+pqxx::connection connectDB() {
+    return pqxx::connection("dbname=task_management_db user=postgres password=Leonid08 host=localhost");
+}
+
+void log(const string& text) {
+    ofstream file("log.txt", ios::app);
+    file << text << endl;
+    file.close();
+}
+
+// Операции
+void addTask() {
+    string title, priority, due_date, status;
+
+    cout << "\nTask title: ";
+    cin.ignore();
+    getline(cin, title);
+
+    cout << "Priority (High/Medium/Low): ";
+    getline(cin, priority);
+
+    cout << "Due date (YYYY-MM-DD): ";
+    getline(cin, due_date);
+
+    cout << "Status (Completed/In Progress/Deferred): ";
+    getline(cin, status);
+
+    try {
+        pqxx::connection conn = connectDB();
+        pqxx::work txn(conn);
+
+        txn.exec("INSERT INTO tasks (title, priority, due_date, status) VALUES (" +
+            txn.quote(title) + ", " + txn.quote(priority) + ", " +
+            txn.quote(due_date) + ", " + txn.quote(status) + ")");
+        txn.commit();
+
+        log("Task added: " + title);
+        cout << "Task added!\n";
+    }
+    catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+    }
+}
+
+void addUser() {
+    string name;
+
+    cout << "\nUser name: ";
+    cin.ignore();
+    getline(cin, name);
+
+    try {
+        pqxx::connection conn = connectDB();
+        pqxx::work txn(conn);
+
+        txn.exec("INSERT INTO users (name) VALUES (" + txn.quote(name) + ")");
+        txn.commit();
+
+        log("User added: " + name);
+        cout << "User added!\n";
+    }
+    catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+    }
+}
+
+void assignTask() {
+    int task_id, user_id;
+
+    cout << "\nTask ID: ";
+    cin >> task_id;
+    cout << "User ID: ";
+    cin >> user_id;
+
+    try {
+        pqxx::connection conn = connectDB();
+        pqxx::work txn(conn);
+
+        txn.exec("INSERT INTO task_assignments (task_id, user_id) VALUES (" +
+            txn.quote(task_id) + ", " + txn.quote(user_id) + ")");
+        txn.commit();
+
+        log("Task " + to_string(task_id) + " assigned to user " + to_string(user_id));
+        cout << "Task assigned!\n";
+    }
+    catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+    }
+}
+
+void changeTaskStatus() {
+    int task_id;
+    string new_status;
+
+    cout << "\nTask ID: ";
+    cin >> task_id;
+    cout << "New status (Completed/In Progress/Deferred): ";
+    cin.ignore();
+    getline(cin, new_status);
+
+    try {
+        pqxx::connection conn = connectDB();
+        pqxx::work txn(conn);
+
+        txn.exec("UPDATE tasks SET status = " + txn.quote(new_status) +
+            " WHERE id = " + txn.quote(task_id));
+        txn.commit();
+
+        log("Task " + to_string(task_id) + " status changed to: " + new_status);
+        cout << "Status changed!\n";
+    }
+    catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+    }
+}
+
+// Аналитические запросы
+void showHighPriorityTasks() {
+    try {
+        pqxx::connection conn = connectDB();
+        pqxx::work txn(conn);
+
+        pqxx::result r = txn.exec("SELECT title, due_date FROM tasks WHERE priority='High'");
+
+        cout << "\n=== High Priority Tasks ===\n";
+        for (auto row : r) {
+            cout << "• " << row[0].c_str() << " (due " << row[1].c_str() << ")\n";
+        }
+
+        log("Query: high priority tasks");
+    }
+    catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+    }
+}
+
+void usersWithAssignments30Days() {
+    try {
+        pqxx::connection conn = connectDB();
+        pqxx::work txn(conn);
+
+        pqxx::result r = txn.exec(
+            "SELECT COUNT(DISTINCT user_id) FROM task_assignments "
+            "WHERE assigned_date >= CURRENT_DATE - INTERVAL '30 days'"
+        );
+
+        cout << "\nUsers with assignments in last 30 days: "
+            << r[0][0].as<int>() << endl;
+
+        log("Query: users with assignments in 30 days");
+    }
+    catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+    }
+}
+
+void tasksDueNextWeek() {
+    try {
+        pqxx::connection conn = connectDB();
+        pqxx::work txn(conn);
+
+        pqxx::result r = txn.exec(
+            "SELECT title, priority, due_date FROM tasks "
+            "WHERE due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'"
+        );
+
+        cout << "\n=== Tasks Due Next Week ===\n";
+        for (auto row : r) {
+            cout << "• " << row[0].c_str() << " [" << row[1].c_str()
+                << "] (due " << row[2].c_str() << ")\n";
+        }
+
+        log("Query: tasks due next week");
+    }
+    catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+    }
+}
+
+void top3UsersByCompletedTasks() {
+    try {
+        pqxx::connection conn = connectDB();
+        pqxx::work txn(conn);
+
+        pqxx::result r = txn.exec(
+            "SELECT users.name, COUNT(*) as task_count FROM users "
+            "JOIN task_assignments ON users.id = task_assignments.user_id "
+            "JOIN tasks ON tasks.id = task_assignments.task_id "
+            "WHERE tasks.status = 'Completed' "
+            "GROUP BY users.name ORDER BY task_count DESC LIMIT 3"
+        );
+
+        cout << "\n=== Top 3 Users by Completed Tasks ===\n";
+        int rank = 1;
+        for (auto row : r) {
+            cout << rank++ << ". " << row[0].c_str()
+                << " - " << row[1].as<int>() << " tasks\n";
+        }
+
+        log("Query: top 3 users by completed tasks");
+    }
+    catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+    }
+}
+
+// Main
+int main() {
+
+    ofstream initLog("log.txt");
+    initLog << "=== Task Management System Started ===\n";
+    initLog.close();
+
+    int choice;
+
+    do {
+        cout << "\n TASK MANAGEMENT SYSTEM \n";
+        cout << "1. Add Task\n";
+        cout << "2. Add User\n";
+        cout << "3. Assign Task to User\n";
+        cout << "4. Change Task Status\n";
+        cout << "\n--- Analytical Queries ---\n";
+        cout << "5. High Priority Tasks\n";
+        cout << "6. Users with Assignments (30 days)\n";
+        cout << "7. Tasks Due Next Week\n";
+        cout << "8. Top 3 Users by Completed Tasks\n";
+        cout << "0. Exit\n";
+        cout << "Choose action: ";
+        cin >> choice;
+
+        switch (choice) {
+        case 1: addTask(); break;
+        case 2: addUser(); break;
+        case 3: assignTask(); break;
+        case 4: changeTaskStatus(); break;
+        case 5: showHighPriorityTasks(); break;
+        case 6: usersWithAssignments30Days(); break;
+        case 7: tasksDueNextWeek(); break;
+        case 8: top3UsersByCompletedTasks(); break;
+        case 0:
+            log("=== System Shutdown ===");
+            cout << "Exiting...\n";
+            break;
+        default:
+            cout << "Invalid choice!\n";
+        }
+
+    } while (choice != 0);
+
+    return 0;
+}
